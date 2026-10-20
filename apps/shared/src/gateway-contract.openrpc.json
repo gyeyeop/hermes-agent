@@ -817,6 +817,24 @@
       }
     },
     {
+      "name": "device.capabilities",
+      "summary": "The device capabilities a session's attached client advertised, so an agent knows what it may ask for over device.request.",
+      "params": [
+        {
+          "name": "params",
+          "schema": {
+            "$ref": "#/components/schemas/DeviceCapabilitiesParams"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/DeviceCapabilitiesResult"
+        }
+      }
+    },
+    {
       "name": "diagnostics.share_nous",
       "summary": "Upload a force-redacted debug bundle to Nous-internal diagnostics storage.",
       "params": [
@@ -8518,6 +8536,19 @@
           "authority_epoch": {
             "title": "Authority Epoch",
             "type": "integer"
+          },
+          "delivered": {
+            "anyOf": [
+              {
+                "const": false,
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Delivered"
           }
         },
         "required": [
@@ -10659,6 +10690,17 @@
               }
             ],
             "default": null
+          },
+          "todo_state": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TodoState"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
           }
         },
         "required": [
@@ -11933,6 +11975,21 @@
             "default": false,
             "title": "Server Requests",
             "type": "boolean"
+          },
+          "device_capabilities": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/DeviceCapability"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Device Capabilities"
           }
         },
         "title": "ClientCapabilitiesParams",
@@ -11952,10 +12009,18 @@
             "default": false,
             "title": "Declines Not Shown",
             "type": "boolean"
+          },
+          "device_requests": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Device Requests",
+            "type": "array"
           }
         },
         "required": [
-          "server_requests"
+          "server_requests",
+          "device_requests"
         ],
         "title": "ClientCapabilitiesResult",
         "type": "object"
@@ -16690,6 +16755,162 @@
         "title": "DelegationStatusResult",
         "type": "object"
       },
+      "DeviceCapabilitiesParams": {
+        "additionalProperties": false,
+        "properties": {
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "session_id"
+        ],
+        "title": "DeviceCapabilitiesParams",
+        "type": "object"
+      },
+      "DeviceCapabilitiesResult": {
+        "additionalProperties": false,
+        "properties": {
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "capabilities": {
+            "items": {
+              "$ref": "#/components/schemas/DeviceCapability"
+            },
+            "title": "Capabilities",
+            "type": "array"
+          }
+        },
+        "required": [
+          "session_id",
+          "capabilities"
+        ],
+        "title": "DeviceCapabilitiesResult",
+        "type": "object"
+      },
+      "DeviceCapability": {
+        "description": "What a handheld client can offer the agent on request \u2014 the closed vocabulary a client\nadvertises in ``client.capabilities`` and the backend may then ask for over ``device.request``.\nDeliberately device-shaped, not tool-shaped: a desktop client advertises none of these.",
+        "enum": [
+          "camera",
+          "microphone",
+          "location",
+          "screen_capture",
+          "notifications",
+          "photo_library",
+          "files"
+        ],
+        "title": "DeviceCapability",
+        "type": "string"
+      },
+      "DeviceCapture": {
+        "additionalProperties": false,
+        "description": "One binary body a capability produced (a photo, a screen frame, a recording).\n\nDeliberately a separate field from ``value``: a capture is megabytes, and anything that reaches\nthe model's tool result is re-sent on every later request of the conversation. The backend\nmaterialises ``data`` into the profile's media cache and the tool result carries the PATH\n(``vision_analyze`` reads it like any screenshot), so a frame costs a few hundred bytes of\ncontext instead of a whole base64 image (#11911).",
+        "properties": {
+          "mime_type": {
+            "title": "Mime Type",
+            "type": "string"
+          },
+          "data": {
+            "title": "Data",
+            "type": "string"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Label"
+          }
+        },
+        "required": [
+          "mime_type",
+          "data"
+        ],
+        "title": "DeviceCapture",
+        "type": "object"
+      },
+      "DeviceRequestOptions": {
+        "additionalProperties": true,
+        "description": "Capability-specific knobs the client reads (``{quality: \"high\"}`` for a camera frame, \u2026).\nOpen by design: the capability vocabulary is closed, its options are not.",
+        "properties": {},
+        "title": "DeviceRequestOptions",
+        "type": "object"
+      },
+      "DeviceRequestParams": {
+        "additionalProperties": false,
+        "description": "``capability`` must be one the client advertised in ``client.capabilities``; the backend\nrefuses the request at once when it did not, so an agent never stalls on a phone-less client.",
+        "properties": {
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "capability": {
+            "$ref": "#/components/schemas/DeviceCapability"
+          },
+          "options": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DeviceRequestOptions"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "required": [
+          "session_id",
+          "capability"
+        ],
+        "title": "DeviceRequestParams",
+        "type": "object"
+      },
+      "DeviceRequestResult": {
+        "additionalProperties": false,
+        "description": "What the capability answered. ``denied`` is the user's refusal \u2014 a distinct outcome from an\nabsent capability, so a tool can report it instead of surfacing a transport failure.\n\n``value`` is the JSON text a non-binary capability produced (a location fix, a notification\nlist, a picked file's metadata); it must stay small \u2014 it is a tool result. Binary bodies belong\nin ``captures``, which never reach the conversation as text.",
+        "properties": {
+          "value": {
+            "default": "",
+            "title": "Value",
+            "type": "string"
+          },
+          "denied": {
+            "default": false,
+            "title": "Denied",
+            "type": "boolean"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Reason"
+          },
+          "captures": {
+            "items": {
+              "$ref": "#/components/schemas/DeviceCapture"
+            },
+            "title": "Captures",
+            "type": "array"
+          }
+        },
+        "title": "DeviceRequestResult",
+        "type": "object"
+      },
       "DiagnosticsShareNousParams": {
         "additionalProperties": false,
         "properties": {
@@ -19212,6 +19433,21 @@
           "max_log_limit": {
             "title": "Max Log Limit",
             "type": "integer"
+          },
+          "seatable_profiles": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Seatable Profiles"
           }
         },
         "required": [
@@ -43785,6 +44021,67 @@
         "title": "ToolOutputRiskPayload",
         "type": "object"
       },
+      "ToolProgressPayload": {
+        "additionalProperties": false,
+        "description": "``agent.tool_progress_relay.tool_progress_payload`` \u2014 an MCP server's\n``notifications/progress`` for a running call, throttled to one per 500 ms per call.",
+        "properties": {
+          "tool_id": {
+            "title": "Tool Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "progress": {
+            "title": "Progress",
+            "type": "number"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Total"
+          },
+          "percent": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Percent"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Message"
+          }
+        },
+        "required": [
+          "tool_id",
+          "name",
+          "progress"
+        ],
+        "title": "ToolProgressPayload",
+        "type": "object"
+      },
       "ToolShowRow": {
         "additionalProperties": false,
         "properties": {
@@ -48024,6 +48321,24 @@
       }
     },
     {
+      "name": "device.request",
+      "summary": "Ask the client's device for one advertised capability (camera frame, location fix, \u2026).",
+      "params": [
+        {
+          "name": "params",
+          "schema": {
+            "$ref": "#/components/schemas/DeviceRequestParams"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/DeviceRequestResult"
+        }
+      }
+    },
+    {
       "name": "display.install.sudo",
       "summary": "Masked sudo password for the Bot Screen package install; app-level (empty session).",
       "params": [
@@ -49149,6 +49464,18 @@
           "name": "payload",
           "schema": {
             "$ref": "#/components/schemas/ToolOutputRiskPayload"
+          }
+        }
+      ]
+    },
+    {
+      "name": "tool.progress",
+      "summary": "Live progress of a running tool call (MCP notifications/progress).",
+      "params": [
+        {
+          "name": "payload",
+          "schema": {
+            "$ref": "#/components/schemas/ToolProgressPayload"
           }
         }
       ]
